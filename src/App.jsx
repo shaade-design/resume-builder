@@ -687,6 +687,35 @@ export default function App() {
     if (window.confirm("Reset this resume back to sample content? Your other saved resumes are untouched.")) setData(INITIAL_DATA);
   };
 
+  const exportData = () => {
+    const raw = localStorage.getItem(STORE_KEY) || "{}";
+    const blob = new Blob([raw], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "resume-builder-backup.json";
+    a.click();
+  };
+
+  const importData = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          JSON.parse(ev.target.result);
+          localStorage.setItem(STORE_KEY, ev.target.result);
+          window.location.reload();
+        } catch { alert("Invalid backup file."); }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
   const lbl = text => <label style={{fontSize:11,color:"#888",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:12}}>{text}</label>;
 
   return (
@@ -710,6 +739,8 @@ export default function App() {
         .sidebar-footer { margin-top: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
         .sidebar-reset { background: none; border: none; font-family: inherit; font-size: 11.5px; color: ${T.light}; cursor: pointer; text-align: left; padding: 0; }
         .sidebar-reset:hover { color: #C0392B; }
+        .sidebar-export { background: none; border: none; font-family: inherit; font-size: 11.5px; color: ${T.light}; cursor: pointer; text-align: left; padding: 0; }
+        .sidebar-export:hover { color: ${T.accent}; }
 
         /* ── Right area ── */
         .right-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
@@ -894,6 +925,8 @@ export default function App() {
             Application Tracker
           </button>
           <div className="sidebar-footer">
+            <button className="sidebar-export" onClick={exportData}>Export data ↓</button>
+            <button className="sidebar-export" onClick={importData}>Import data ↑</button>
             <button className="sidebar-reset" onClick={resetVersion}>Reset to sample</button>
           </div>
         </div>
