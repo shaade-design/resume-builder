@@ -778,7 +778,7 @@ export default function App() {
           .print-only > div { max-width: none !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .rp-sec { break-after: avoid; }
           .rp-job, .rp-bullet, .rp-skill { break-inside: avoid; }
-          .preview-paper { box-shadow: none !important; }
+          * { box-shadow: none !important; }
         }
 
         /* ── Common editor styles ── */
