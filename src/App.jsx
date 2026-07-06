@@ -772,7 +772,9 @@ export default function App() {
         .print-only { display: none; }
         @media print {
           @page { size: letter; margin: 0.75in; }
-          html, body { background: #FFFFFF !important; }
+          html, body, #root { background: #FFFFFF !important; }
+          body * { background-color: transparent; }
+          .print-only > div { background: #FFFFFF !important; }
           .app { display: none !important; }
           .print-only { display: block !important; }
           .print-only > div { max-width: none !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
