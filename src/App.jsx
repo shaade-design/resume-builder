@@ -420,31 +420,44 @@ function GrowTextarea({ value, onChange, className="", placeholder="", minHeight
   return <textarea ref={ref} className={`field ${className}`} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} />;
 }
 
-function BulletEditor({ bullet, onChange, onDelete, onMoveUp, onMoveDown, isFirst, isLast }) {
+const DragHandle = () => (
+  <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" style={{display:"block"}}>
+    <circle cx="3" cy="3.5" r="1.5"/><circle cx="7" cy="3.5" r="1.5"/>
+    <circle cx="3" cy="8" r="1.5"/><circle cx="7" cy="8" r="1.5"/>
+    <circle cx="3" cy="12.5" r="1.5"/><circle cx="7" cy="12.5" r="1.5"/>
+  </svg>
+);
+
+function BulletEditor({ bullet, onChange, onDelete, dragging, dragOver, onDragStart, onDragEnd, onDragOver, onDrop }) {
   return (
-    <div className="bullet-row">
+    <div
+      className={`bullet-row${dragging?" dragging":""}${dragOver?" drag-over":""}`}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      <div className="bullet-drag-handle" draggable onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <DragHandle/>
+      </div>
       <div className="bullet-dot">•</div>
       <div className="bullet-fields">
         <input className="field bullet-label" value={bullet.label} onChange={e=>onChange({...bullet,label:e.target.value})} placeholder="Bullet title (optional)"/>
         <textarea className="field bullet-body" value={bullet.body} onChange={e=>onChange({...bullet,body:e.target.value})} placeholder="Bullet body" rows={3}/>
       </div>
-      <div className="bullet-actions">
-        <button className="icon-btn reorder-btn" onClick={onMoveUp} disabled={isFirst} title="Move up">↑</button>
-        <button className="icon-btn reorder-btn" onClick={onMoveDown} disabled={isLast} title="Move down">↓</button>
-        <button className="icon-btn delete-btn" onClick={onDelete}>×</button>
-      </div>
+      <button className="icon-btn delete-btn" onClick={onDelete}>×</button>
     </div>
   );
 }
 
 function JobEditor({ job, onChange, onDelete }) {
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
   const updateBullet=(i,u)=>{const b=[...job.bullets];b[i]=u;onChange({...job,bullets:b});};
   const deleteBullet=i=>onChange({...job,bullets:job.bullets.filter((_,j)=>j!==i)});
-  const moveBullet=(i,dir)=>{
+  const reorderBullets=(from,to)=>{
+    if(from===to) return;
     const b=[...job.bullets];
-    const j=i+dir;
-    if(j<0||j>=b.length) return;
-    [b[i],b[j]]=[b[j],b[i]];
+    const [item]=b.splice(from,1);
+    b.splice(to,0,item);
     onChange({...job,bullets:b});
   };
   const addBullet=()=>onChange({...job,bullets:[...job.bullets,{id:Date.now(),label:"",body:""}]});
@@ -465,7 +478,7 @@ function JobEditor({ job, onChange, onDelete }) {
         </div>
         <button className="icon-btn delete-btn" onClick={onDelete}>×</button>
       </div>
-      <div className="bullets-list">{job.bullets.map((b,i)=><BulletEditor key={b.id} bullet={b} onChange={u=>updateBullet(i,u)} onDelete={()=>deleteBullet(i)} onMoveUp={()=>moveBullet(i,-1)} onMoveDown={()=>moveBullet(i,1)} isFirst={i===0} isLast={i===job.bullets.length-1}/>)}</div>
+      <div className="bullets-list">{job.bullets.map((b,i)=><BulletEditor key={b.id} bullet={b} onChange={u=>updateBullet(i,u)} onDelete={()=>deleteBullet(i)} dragging={dragIdx===i} dragOver={overIdx===i&&dragIdx!==i} onDragStart={()=>setDragIdx(i)} onDragEnd={()=>{reorderBullets(dragIdx,overIdx??dragIdx);setDragIdx(null);setOverIdx(null);}} onDragOver={e=>{e.preventDefault();setOverIdx(i);}} onDrop={e=>{e.preventDefault();}}/>)}</div>
       <button className="add-btn" onClick={addBullet}>+ Add bullet</button>
     </div>
   );
@@ -982,11 +995,12 @@ export default function App() {
         .field.job-dates { width: 160px; min-width: 160px; color: #888; }
         .field.job-subtitle { flex: 1; color: #888; }
         .bullets-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
-        .bullet-row { display: flex; gap: 10px; align-items: flex-start; }
-        .bullet-actions { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
-        .reorder-btn { color: #ccc; font-size: 14px; padding: 2px 4px; }
-        .reorder-btn:hover:not(:disabled) { color: ${T.accent}; background: rgba(211,79,47,0.08); }
-        .reorder-btn:disabled { opacity: 0.2; cursor: default; }
+        .bullet-row { display: flex; gap: 10px; align-items: flex-start; border-top: 2px solid transparent; transition: border-color 0.1s; border-radius: 2px; }
+        .bullet-row.dragging { opacity: 0.35; }
+        .bullet-row.drag-over { border-top-color: ${T.accent}; }
+        .bullet-drag-handle { color: #CCC; cursor: grab; padding: 9px 2px 0; flex-shrink: 0; display: flex; align-items: flex-start; }
+        .bullet-drag-handle:hover { color: #999; }
+        .bullet-drag-handle:active { cursor: grabbing; }
         .bullet-dot { color: ${T.accent}; font-size: 16px; line-height: 1; margin-top: 9px; flex-shrink: 0; font-weight: 700; }
         .bullet-fields { flex: 1; display: flex; flex-direction: column; gap: 6px; }
         .field.bullet-label { font-weight: 600; font-size: 12px; }
