@@ -420,7 +420,7 @@ function GrowTextarea({ value, onChange, className="", placeholder="", minHeight
   return <textarea ref={ref} className={`field ${className}`} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} />;
 }
 
-function BulletEditor({ bullet, onChange, onDelete }) {
+function BulletEditor({ bullet, onChange, onDelete, onMoveUp, onMoveDown, isFirst, isLast }) {
   return (
     <div className="bullet-row">
       <div className="bullet-dot">•</div>
@@ -428,7 +428,11 @@ function BulletEditor({ bullet, onChange, onDelete }) {
         <input className="field bullet-label" value={bullet.label} onChange={e=>onChange({...bullet,label:e.target.value})} placeholder="Bullet title (optional)"/>
         <textarea className="field bullet-body" value={bullet.body} onChange={e=>onChange({...bullet,body:e.target.value})} placeholder="Bullet body" rows={3}/>
       </div>
-      <button className="icon-btn delete-btn" onClick={onDelete}>×</button>
+      <div className="bullet-actions">
+        <button className="icon-btn reorder-btn" onClick={onMoveUp} disabled={isFirst} title="Move up">↑</button>
+        <button className="icon-btn reorder-btn" onClick={onMoveDown} disabled={isLast} title="Move down">↓</button>
+        <button className="icon-btn delete-btn" onClick={onDelete}>×</button>
+      </div>
     </div>
   );
 }
@@ -436,6 +440,13 @@ function BulletEditor({ bullet, onChange, onDelete }) {
 function JobEditor({ job, onChange, onDelete }) {
   const updateBullet=(i,u)=>{const b=[...job.bullets];b[i]=u;onChange({...job,bullets:b});};
   const deleteBullet=i=>onChange({...job,bullets:job.bullets.filter((_,j)=>j!==i)});
+  const moveBullet=(i,dir)=>{
+    const b=[...job.bullets];
+    const j=i+dir;
+    if(j<0||j>=b.length) return;
+    [b[i],b[j]]=[b[j],b[i]];
+    onChange({...job,bullets:b});
+  };
   const addBullet=()=>onChange({...job,bullets:[...job.bullets,{id:Date.now(),label:"",body:""}]});
   return (
     <div className="job-block">
@@ -454,7 +465,7 @@ function JobEditor({ job, onChange, onDelete }) {
         </div>
         <button className="icon-btn delete-btn" onClick={onDelete}>×</button>
       </div>
-      <div className="bullets-list">{job.bullets.map((b,i)=><BulletEditor key={b.id} bullet={b} onChange={u=>updateBullet(i,u)} onDelete={()=>deleteBullet(i)}/>)}</div>
+      <div className="bullets-list">{job.bullets.map((b,i)=><BulletEditor key={b.id} bullet={b} onChange={u=>updateBullet(i,u)} onDelete={()=>deleteBullet(i)} onMoveUp={()=>moveBullet(i,-1)} onMoveDown={()=>moveBullet(i,1)} isFirst={i===0} isLast={i===job.bullets.length-1}/>)}</div>
       <button className="add-btn" onClick={addBullet}>+ Add bullet</button>
     </div>
   );
@@ -972,6 +983,10 @@ export default function App() {
         .field.job-subtitle { flex: 1; color: #888; }
         .bullets-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
         .bullet-row { display: flex; gap: 10px; align-items: flex-start; }
+        .bullet-actions { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+        .reorder-btn { color: #ccc; font-size: 14px; padding: 2px 4px; }
+        .reorder-btn:hover:not(:disabled) { color: ${T.accent}; background: rgba(211,79,47,0.08); }
+        .reorder-btn:disabled { opacity: 0.2; cursor: default; }
         .bullet-dot { color: ${T.accent}; font-size: 16px; line-height: 1; margin-top: 9px; flex-shrink: 0; font-weight: 700; }
         .bullet-fields { flex: 1; display: flex; flex-direction: column; gap: 6px; }
         .field.bullet-label { font-weight: 600; font-size: 12px; }
