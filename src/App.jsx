@@ -696,6 +696,16 @@ export default function App() {
   const [clTab, setClTab] = useState("content");
   const [clExporting, setClExporting] = useState(false);
   const [clStatus, setClStatus] = useState("");
+  const [skillDragIdx, setSkillDragIdx] = useState(null);
+  const [skillOverIdx, setSkillOverIdx] = useState(null);
+  const reorderSkills = (from, to) => {
+    if (from === to || to === null) return;
+    const rows = [...data.skillRows];
+    const [item] = rows.splice(from, 1);
+    rows.splice(to, 0, item);
+    setData({ ...data, skillRows: rows });
+  };
+
   const [appSort, setAppSort] = useState({ key: "date", dir: "desc" });
   const [trackerFilter, setTrackerFilter] = useState("all");
   const [editingAppId, setEditingAppId] = useState(null);
@@ -1010,8 +1020,10 @@ export default function App() {
         .icon-btn { background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; padding: 4px; border-radius: 4px; transition: all 0.15s; flex-shrink: 0; }
         .delete-btn { color: #ccc; }
         .delete-btn:hover { color: #e05555; background: rgba(224,85,85,0.08); }
-        .skill-block { background: white; border: 1px solid ${T.border}; border-radius: 8px; padding: 16px 20px; margin-bottom: 14px; }
-        .skill-block-header { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+        .skill-block { background: white; border: 1px solid ${T.border}; border-radius: 8px; padding: 16px 20px; margin-bottom: 14px; border-top: 2px solid transparent; transition: border-color 0.1s, opacity 0.15s; }
+        .skill-block.dragging { opacity: 0.35; }
+        .skill-block.drag-over { border-top-color: ${T.accent}; }
+        .skill-block-header { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
         .field.skill-label { flex: 1; font-weight: 600; }
         .field.skill-value { width: 100%; min-height: 76px; font-size: 13px; line-height: 1.55; resize: none; overflow: hidden; }
         .section-card { background: white; border: 1px solid ${T.border}; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
@@ -1215,8 +1227,22 @@ export default function App() {
                   <button className="add-btn" onClick={addSkill}>+ Add category</button>
                 </div>
                 {data.skillRows.map((s,i)=>(
-                  <div key={s.id} className="skill-block">
+                  <div
+                    key={s.id}
+                    className={`skill-block${skillDragIdx===i?" dragging":""}${skillOverIdx===i&&skillDragIdx!==i?" drag-over":""}`}
+                    onDragOver={e=>{e.preventDefault();setSkillOverIdx(i);}}
+                    onDrop={e=>e.preventDefault()}
+                  >
                     <div className="skill-block-header">
+                      <div
+                        className="bullet-drag-handle"
+                        style={{padding:"2px 4px 0 0"}}
+                        draggable
+                        onDragStart={()=>setSkillDragIdx(i)}
+                        onDragEnd={()=>{reorderSkills(skillDragIdx,skillOverIdx);setSkillDragIdx(null);setSkillOverIdx(null);}}
+                      >
+                        <DragHandle/>
+                      </div>
                       <input className="field skill-label" value={s.label} onChange={e=>updateSkill(i,{...s,label:e.target.value})} placeholder="Category (e.g. Design & Craft)"/>
                       <button className="icon-btn delete-btn" onClick={()=>deleteSkill(i)}>×</button>
                     </div>
