@@ -78,6 +78,14 @@ const T = {
   hair: "#E3E1DC",
 };
 
+const INITIAL_CL_DATA = {
+  company: "",
+  hiringManager: "",
+  role: "Senior Product Designer",
+  date: "",
+  body: "",
+};
+
 const contactLine = (c) => [c.location, c.email, c.phone, c.website].filter(Boolean).join("  ·  ");
 
 // ── ZIP builder (no deps) ─────────────────────────────────────────────────────
@@ -475,7 +483,11 @@ function loadStore() {
       if (s && Array.isArray(s.versions) && s.versions.length) {
         const versions = s.versions.map(v => ({ id: v.id || newId(), name: v.name || "Untitled", data: normalizeData(v.data) }));
         const current = versions.some(v => v.id === s.current) ? s.current : versions[0].id;
-        return { versions, current };
+        const clVersions = Array.isArray(s.clVersions) && s.clVersions.length
+          ? s.clVersions
+          : [{ id: newId(), name: "New Cover Letter", data: { ...INITIAL_CL_DATA, date: new Date().toISOString().slice(0, 10) } }];
+        const clCurrent = clVersions.some(v => v.id === s.clCurrent) ? s.clCurrent : clVersions[0].id;
+        return { versions, current, clVersions, clCurrent };
       }
     }
     const oldRaw = window.localStorage.getItem(OLD_DATA_KEY);
@@ -483,12 +495,63 @@ function loadStore() {
       const parsed = JSON.parse(oldRaw);
       if (parsed && Array.isArray(parsed.jobs)) {
         const v = { id: newId(), name: "My Resume", data: normalizeData(parsed) };
-        return { versions: [v], current: v.id };
+        const clV = { id: newId(), name: "New Cover Letter", data: { ...INITIAL_CL_DATA, date: new Date().toISOString().slice(0, 10) } };
+        return { versions: [v], current: v.id, clVersions: [clV], clCurrent: clV.id };
       }
     }
   } catch (e) { /* ignore */ }
   const v = { id: newId(), name: "My Resume", data: INITIAL_DATA };
-  return { versions: [v], current: v.id };
+  const clV = { id: newId(), name: "New Cover Letter", data: { ...INITIAL_CL_DATA, date: new Date().toISOString().slice(0, 10) } };
+  return { versions: [v], current: v.id, clVersions: [clV], clCurrent: clV.id };
+}
+
+function buildClDocx(clData, contact, authorName) {
+  const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const ACCENT="D34F2F", DARK="1C1C1E", MID="555558", LIGHT="909094";
+  const F = "Inter";
+  const rPr = (o={}) => {
+    let s="";
+    if(o.bold) s+="<w:b/>";
+    if(o.size) s+=`<w:sz w:val="${o.size}"/>`;
+    if(o.color) s+=`<w:color w:val="${o.color}"/>`;
+    if(o.font) s+=`<w:rFonts w:ascii="${o.font}" w:hAnsi="${o.font}"/>`;
+    if(o.spacing) s+=`<w:spacing w:val="${o.spacing}"/>`;
+    return s?`<w:rPr>${s}</w:rPr>`:"";
+  };
+  const run=(text,o={})=>`<w:r>${rPr(o)}<w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
+  const para=(content,o={})=>{
+    let pp="";
+    if(o.before||o.after) pp+=`<w:spacing w:before="${o.before||0}" w:after="${o.after||0}"/>`;
+    return `<w:p>${pp?`<w:pPr>${pp}</w:pPr>`:""}${content}</w:p>`;
+  };
+  const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const fmtDate=(d)=>{if(!d)return"";const[y,m,dy]=d.split("-");return`${MONTHS[parseInt(m,10)-1]} ${parseInt(dy,10)}, ${y}`;};
+  const contactLine=[contact.location,contact.email,contact.phone,contact.website].filter(Boolean).join("  ·  ");
+  const bodyParts=[
+    para(run(authorName||"",{size:48,color:ACCENT,font:F,spacing:-10}),{after:20}),
+    para(run(contactLine,{size:17,color:LIGHT,font:F}),{after:240}),
+    clData.date?para(run(fmtDate(clData.date),{size:18,font:F,color:MID}),{after:160}):"",
+    clData.hiringManager?para(run(clData.hiringManager,{size:18,font:F,color:DARK}),{after:0}):"",
+    clData.company?para(run(clData.company,{size:18,font:F,color:DARK}),{after:0}):"",
+    (clData.hiringManager||clData.company)&&clData.role?para(run("Re: "+clData.role,{size:18,font:F,color:MID}),{after:160}):"",
+    para(run("Dear "+(clData.hiringManager||"Hiring Manager")+",",{size:18,font:F,color:DARK}),{after:160}),
+    ...(clData.body||"").split("\n").map(line=>para(run(line,{size:18,font:F,color:DARK}),{after:160})),
+    para(run("Sincerely,",{size:18,font:F,color:DARK}),{after:0}),
+    para("",{after:0}),para("",{after:0}),para("",{after:0}),
+    para(run(authorName||"",{size:18,font:F,color:DARK,bold:true}),{after:0}),
+  ].filter(Boolean).join("\n");
+  const document=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${bodyParts}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`;
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Inter" w:hAnsi="Inter" w:cs="Inter"/><w:sz w:val="18"/></w:rPr></w:rPrDefault></w:docDefaults></w:styles>`;
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+  const appRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const contentTypes=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`;
+  const zip=buildZip([["[Content_Types].xml",contentTypes],["_rels/.rels",appRels],["word/document.xml",document],["word/styles.xml",styles],["word/_rels/document.xml.rels",rels]]);
+  const blob=new Blob([zip],{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const url=URL.createObjectURL(blob);
+  const a=window.document.createElement("a");
+  const fn=[(authorName||"").replace(/\s+/g,"_"),clData.company.replace(/\s+/g,"_")].filter(Boolean).join("_");
+  a.href=url; a.download=`${fn}_Cover_Letter.docx`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 // ── App tracker helpers ───────────────────────────────────────────────────
@@ -553,6 +616,32 @@ function AppAvatar({ app }) {
   );
 }
 
+function CoverLetterPreview({ clData, contact, authorName }) {
+  const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const fmtDate=(d)=>{if(!d)return"";const[y,m,dy]=d.split("-");return`${MONTHS[parseInt(m,10)-1]} ${parseInt(dy,10)}, ${y}`;};
+  const contactLine=[contact.location,contact.email,contact.phone,contact.website].filter(Boolean).join(" · ");
+  return (
+    <div style={{fontFamily:"'Inter',-apple-system,sans-serif",background:"white",padding:"60px 72px",maxWidth:760,margin:"0 auto",color:"#1C1C1E",fontSize:13,lineHeight:1.7,minHeight:"100%"}}>
+      <div style={{marginBottom:36}}>
+        <div style={{fontSize:26,fontWeight:300,color:"#D34F2F",letterSpacing:"-0.02em",marginBottom:4}}>{authorName}</div>
+        <div style={{fontSize:12,color:"#909094"}}>{contactLine}</div>
+      </div>
+      {clData.date&&<div style={{marginBottom:20,fontSize:13,color:"#555558"}}>{fmtDate(clData.date)}</div>}
+      {(clData.hiringManager||clData.company)&&(
+        <div style={{marginBottom:20,fontSize:13,color:"#555558",lineHeight:1.7}}>
+          {clData.hiringManager&&<div>{clData.hiringManager}</div>}
+          {clData.company&&<div>{clData.company}</div>}
+          {clData.role&&<div>Re: {clData.role}</div>}
+        </div>
+      )}
+      <div style={{marginBottom:20,fontSize:13,color:"#1C1C1E"}}>Dear {clData.hiringManager||"Hiring Manager"},</div>
+      <div style={{whiteSpace:"pre-wrap",fontSize:13,lineHeight:1.8,color:"#1C1C1E",marginBottom:36}}>{clData.body||<span style={{color:"#CCCCCC",fontStyle:"italic"}}>Letter body will appear here…</span>}</div>
+      <div style={{fontSize:13,color:"#1C1C1E"}}>Sincerely,</div>
+      <div style={{marginTop:40,fontSize:13,fontWeight:600,color:"#1C1C1E"}}>{authorName}</div>
+    </div>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
 const RESUME_TABS = [
   { id: "header", label: "Header" },
@@ -573,9 +662,16 @@ export default function App() {
   const data = current.data;
   const setData = (next) => setStore(s => ({ ...s, versions: s.versions.map(v => v.id === current.id ? { ...v, data: next } : v) }));
 
+  const clCurrent = (store.clVersions||[]).find(v => v.id === store.clCurrent) || (store.clVersions||[])[0];
+  const clData = clCurrent?.data || { ...INITIAL_CL_DATA };
+  const setClData = (next) => setStore(s => ({ ...s, clVersions: (s.clVersions||[]).map(v => v.id === clCurrent.id ? { ...v, data: next } : v) }));
+
   const [active, setActive] = useState("header");
   const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState("");
+  const [clTab, setClTab] = useState("content");
+  const [clExporting, setClExporting] = useState(false);
+  const [clStatus, setClStatus] = useState("");
   const [appSort, setAppSort] = useState({ key: "date", dir: "desc" });
   const [trackerFilter, setTrackerFilter] = useState("all");
   const [editingAppId, setEditingAppId] = useState(null);
@@ -617,7 +713,41 @@ export default function App() {
   const deleteVersion = (id) => setStore(s => {
     if (s.versions.length <= 1) return s;
     const versions = s.versions.filter(v => v.id !== id);
-    return { versions, current: s.current === id ? versions[0].id : s.current };
+    return { ...s, versions, current: s.current === id ? versions[0].id : s.current };
+  });
+
+  const switchClVersion = (id) => setStore(s => ({ ...s, clCurrent: id }));
+  const renameClVersion = (id, name) => setStore(s => ({ ...s, clVersions: (s.clVersions||[]).map(v => v.id === id ? { ...v, name } : v) }));
+  const addNewCl = () => {
+    setStore(s => {
+      const v = { id: newId(), name: "New Cover Letter", data: { ...INITIAL_CL_DATA, date: new Date().toISOString().slice(0,10) } };
+      return { ...s, clVersions: [...(s.clVersions||[]), v], clCurrent: v.id };
+    });
+    setActive("coverletters"); setClTab("content");
+  };
+  const saveClSnapshot = () => {
+    const name = window.prompt("Name this cover letter:", clCurrent?.name || "Cover Letter");
+    if (!name || !name.trim()) return;
+    setStore(s => {
+      const snapshot = { id: newId(), name: name.trim(), data: JSON.parse(JSON.stringify(clData)) };
+      return { ...s, clVersions: [...(s.clVersions||[]), snapshot] };
+    });
+  };
+  const loadClFromSnapshot = (id) => {
+    const src = (store.clVersions||[]).find(v => v.id === id);
+    if (!src) return;
+    const name = window.prompt("Name this working copy:", src.name);
+    if (!name || !name.trim()) return;
+    setStore(s => {
+      const copy = { id: newId(), name: name.trim(), data: JSON.parse(JSON.stringify(src.data)) };
+      return { ...s, clVersions: [...(s.clVersions||[]), copy], clCurrent: copy.id };
+    });
+    setActive("coverletters"); setClTab("content");
+  };
+  const deleteClVersion = (id) => setStore(s => {
+    if ((s.clVersions?.length||0) <= 1) return s;
+    const clVersions = (s.clVersions||[]).filter(v => v.id !== id);
+    return { ...s, clVersions, clCurrent: s.clCurrent === id ? clVersions[0].id : s.clCurrent };
   });
 
   const updateJob=(i,u)=>{const jobs=[...data.jobs];jobs[i]=u;setData({...data,jobs});};
@@ -681,6 +811,28 @@ export default function App() {
     catch(e) { console.error(e); setStatus("Error"); }
     setExporting(false);
     setTimeout(()=>setStatus(""),3000);
+  };
+
+  const handleClExport=()=>{
+    setClExporting(true); setClStatus("Building...");
+    try { buildClDocx(clData, data.contact, data.name); setClStatus("Downloaded!"); }
+    catch(e) { console.error(e); setClStatus("Error"); }
+    setClExporting(false);
+    setTimeout(()=>setClStatus(""),3000);
+  };
+
+  const exportResumePdf=()=>{
+    document.body.setAttribute("data-printing","resume");
+    const cleanup=()=>{document.body.removeAttribute("data-printing");window.removeEventListener("afterprint",cleanup);};
+    window.addEventListener("afterprint",cleanup);
+    window.print();
+  };
+
+  const exportClPdf=()=>{
+    document.body.setAttribute("data-printing","cl");
+    const cleanup=()=>{document.body.removeAttribute("data-printing");window.removeEventListener("afterprint",cleanup);};
+    window.addEventListener("afterprint",cleanup);
+    window.print();
   };
 
   const resetVersion = () => {
@@ -770,18 +922,35 @@ export default function App() {
 
         /* ── Print ── */
         .print-only { display: none; }
+        .cl-print-only { display: none; }
         @media print {
           @page { size: letter; margin: 0.75in; }
           html, body, #root { background: #FFFFFF !important; }
           body * { background-color: transparent; }
-          .print-only > div { background: #FFFFFF !important; }
           .app { display: none !important; }
-          .print-only { display: block !important; }
-          .print-only > div { max-width: none !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          /* Resume print (default when no data-printing, or data-printing=resume) */
+          body:not([data-printing="cl"]) .print-only { display: block !important; }
+          body:not([data-printing="cl"]) .print-only > div { background: #FFFFFF !important; max-width: none !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          /* Cover letter print */
+          body[data-printing="cl"] .cl-print-only { display: block !important; }
+          body[data-printing="cl"] .cl-print-only > div { background: #FFFFFF !important; max-width: none !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .rp-sec { break-after: avoid; }
           .rp-job, .rp-bullet, .rp-skill { break-inside: avoid; }
           * { box-shadow: none !important; }
         }
+
+        /* ── Cover Letter ── */
+        .cl-tab-bar { display: flex; align-items: stretch; padding: 0 28px; background: ${T.bg}; border-bottom: 1px solid ${T.border}; flex-shrink: 0; }
+        .cl-layout { flex: 1; display: flex; overflow: hidden; }
+        .cl-form-scroll { flex: 1; overflow-y: auto; padding: 28px; max-width: 720px; }
+        .cl-field-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
+        .cl-field-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: ${T.light}; }
+        .cl-body-textarea { min-height: 360px; line-height: 1.7; resize: vertical; }
+        .cl-preview-layout { flex: 1; display: flex; overflow: hidden; }
+        .cl-preview-scroll { flex: 1; overflow-y: auto; background: #E8E6E1; padding: 32px; }
+        .cl-preview-paper { background: white; max-width: 760px; margin: 0 auto; padding: 60px 72px; font-family: 'Inter',-apple-system,sans-serif; font-size: 13px; line-height: 1.7; color: #1C1C1E; box-shadow: 0 4px 32px rgba(0,0,0,0.12); }
+        .cl-preview-actions { width: 200px; flex-shrink: 0; border-left: 1px solid ${T.border}; padding: 24px 20px; display: flex; flex-direction: column; gap: 10px; background: ${T.bg}; overflow-y: auto; }
+        .cl-ver-select { width: 100%; background: white; border: 1px solid ${T.border}; border-radius: 6px; padding: 7px 10px; font-size: 12.5px; font-family: inherit; cursor: pointer; color: ${T.dark}; font-weight: 500; -webkit-appearance: none; appearance: none; margin-bottom: 4px; }
 
         /* ── Common editor styles ── */
         .section-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: ${T.accent}; margin-bottom: 20px; }
@@ -914,7 +1083,7 @@ export default function App() {
             </select>
           </div>
           <div className="sidebar-divider"/>
-          <div className="sidebar-nav-label">Workspace</div>
+          <div className="sidebar-nav-label">Resume</div>
           <button
             className={`sidebar-item ${isResumeTab ? "active" : ""}`}
             onClick={() => setActive(isResumeTab ? active : "header")}
@@ -924,6 +1093,21 @@ export default function App() {
           <button className={`sidebar-item ${active==="versions"?"active":""}`} onClick={()=>setActive("versions")}>
             Saved Resumes
           </button>
+          <div className="sidebar-nav-label">Cover Letters</div>
+          {(store.clVersions||[]).length > 1 && (
+            <div style={{padding:"0 14px 8px"}}>
+              <select className="cl-ver-select" value={store.clCurrent} onChange={e=>switchClVersion(e.target.value)}>
+                {(store.clVersions||[]).map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
+          )}
+          <button className={`sidebar-item ${active==="coverletters"?"active":""}`} onClick={()=>{setActive("coverletters");setClTab("content");}}>
+            Cover Letters
+          </button>
+          <button className={`sidebar-item ${active==="saved-cls"?"active":""}`} onClick={()=>setActive("saved-cls")}>
+            Saved Cover Letters
+          </button>
+          <div className="sidebar-nav-label">Tracker</div>
           <button className={`sidebar-item ${active==="applications"?"active":""}`} onClick={()=>setActive("applications")}>
             Application Tracker
           </button>
@@ -958,7 +1142,7 @@ export default function App() {
               </div>
               <div className="preview-actions">
                 <div className="preview-actions-label">Export</div>
-                <button className="pa-btn primary" onClick={()=>window.print()}>Export PDF</button>
+                <button className="pa-btn primary" onClick={exportResumePdf}>Export PDF</button>
                 <button className="pa-btn" onClick={handleExport} disabled={exporting}>{exporting?"Building…":"Export .docx"}</button>
                 {status && <div className="pa-status">{status}</div>}
                 <div className="preview-divider"/>
@@ -1069,6 +1253,101 @@ export default function App() {
                           </div>
                           <button className="ver-btn primary" onClick={()=>loadFromSnapshot(v.id)}>Load copy</button>
                           <button className="ver-btn danger" onClick={()=>{ if(window.confirm(`Delete "${v.name}"? This can't be undone.`)) deleteVersion(v.id); }} disabled={store.versions.length<=1}>Delete</button>
+                        </div>
+                      ))}
+                    </div>
+                }
+              </div>
+            </div>
+          )}
+
+          {/* ── Cover Letters ── */}
+          {active==="coverletters" && (
+            <>
+              <div className="cl-tab-bar">
+                <button className={`tab ${clTab==="content"?"active":""}`} onClick={()=>setClTab("content")}>Content</button>
+                <button className={`tab ${clTab==="preview"?"active":""}`} onClick={()=>setClTab("preview")}>Preview</button>
+              </div>
+              {clTab==="content" && (
+                <div className="cl-layout">
+                  <div className="cl-form-scroll">
+                    <div className="section-title">Cover Letter</div>
+                    {clCurrent && (
+                      <div style={{marginBottom:20}}>
+                        <input className="field" style={{fontWeight:600,fontSize:14}} value={clCurrent.name} onChange={e=>renameClVersion(clCurrent.id,e.target.value)} placeholder="Cover letter name"/>
+                      </div>
+                    )}
+                    <div className="cl-field-group">
+                      <div className="cl-field-label">Company</div>
+                      <input className="field" value={clData.company} onChange={e=>setClData({...clData,company:e.target.value})} placeholder="Company name"/>
+                    </div>
+                    <div className="cl-field-group">
+                      <div className="cl-field-label">Hiring Manager / Recipient</div>
+                      <input className="field" value={clData.hiringManager} onChange={e=>setClData({...clData,hiringManager:e.target.value})} placeholder="e.g. Alex Johnson (or leave blank for 'Hiring Manager')"/>
+                    </div>
+                    <div style={{display:"flex",gap:12}}>
+                      <div className="cl-field-group" style={{flex:2}}>
+                        <div className="cl-field-label">Role</div>
+                        <input className="field" value={clData.role} onChange={e=>setClData({...clData,role:e.target.value})} placeholder="Role you're applying for"/>
+                      </div>
+                      <div className="cl-field-group" style={{flex:1}}>
+                        <div className="cl-field-label">Date</div>
+                        <DateField value={clData.date} onChange={e=>setClData({...clData,date:e.target.value})}/>
+                      </div>
+                    </div>
+                    <div className="cl-field-group">
+                      <div className="cl-field-label">Letter Body</div>
+                      <textarea className="field cl-body-textarea" value={clData.body} onChange={e=>setClData({...clData,body:e.target.value})} placeholder="Write your cover letter here…"/>
+                    </div>
+                    <button className="add-btn" style={{marginTop:8}} onClick={addNewCl}>+ New cover letter</button>
+                  </div>
+                </div>
+              )}
+              {clTab==="preview" && (
+                <div className="cl-preview-layout">
+                  <div className="cl-preview-scroll">
+                    <div className="cl-preview-paper">
+                      <CoverLetterPreview clData={clData} contact={data.contact} authorName={data.name}/>
+                    </div>
+                  </div>
+                  <div className="cl-preview-actions">
+                    <div className="preview-actions-label">Export</div>
+                    <button className="pa-btn primary" onClick={exportClPdf}>Export PDF</button>
+                    <button className="pa-btn" onClick={handleClExport} disabled={clExporting}>{clExporting?"Building…":"Export .docx"}</button>
+                    {clStatus && <div className="pa-status">{clStatus}</div>}
+                    <div className="preview-divider"/>
+                    <div className="preview-actions-label">Snapshots</div>
+                    <button className="pa-btn" onClick={saveClSnapshot}>Save snapshot…</button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Saved Cover Letters ── */}
+          {active==="saved-cls" && (
+            <div className="main">
+              <div className="jobs-header">
+                <div className="section-title" style={{marginBottom:0}}>Saved Cover Letters</div>
+                <button className="add-btn" onClick={addNewCl}>+ New cover letter</button>
+              </div>
+              <div className="apps-empty" style={{marginBottom:20,paddingTop:0}}>
+                These are your saved cover letter snapshots. <strong>Load copy</strong> creates a fresh editable copy so your snapshot stays untouched. To save a snapshot, go to <strong>Cover Letters → Preview → Save snapshot</strong>.
+              </div>
+              <div className="section-card">
+                {(store.clVersions||[]).length === 0
+                  ? <div className="apps-empty">No cover letters yet. Click <strong>+ New cover letter</strong> to start.</div>
+                  : <div className="ver-list">
+                      {(store.clVersions||[]).map(v=>(
+                        <div key={v.id} className={`ver-row ${v.id===clCurrent?.id?"active":""}`}>
+                          <div className="ver-meta">
+                            <input className="field ver-name" value={v.name} onChange={e=>renameClVersion(v.id,e.target.value)} placeholder="Cover letter name"/>
+                            <div style={{fontSize:11.5,color:T.light,marginTop:2}}>{v.data?.company||<em style={{color:"#CCC"}}>No company</em>}{v.data?.role ? ` · ${v.data.role}` : ""}</div>
+                            {v.id===clCurrent?.id && <span className="ver-editing-badge">currently editing</span>}
+                          </div>
+                          <button className="ver-btn primary" onClick={()=>loadClFromSnapshot(v.id)}>Load copy</button>
+                          <button className="ver-btn" style={{color:T.accent,borderColor:T.accent}} onClick={()=>{switchClVersion(v.id);setActive("coverletters");setClTab("content");}}>Open</button>
+                          <button className="ver-btn danger" onClick={()=>{ if(window.confirm(`Delete "${v.name}"? This can't be undone.`)) deleteClVersion(v.id); }} disabled={(store.clVersions?.length||0)<=1}>Delete</button>
                         </div>
                       ))}
                     </div>
@@ -1203,6 +1482,9 @@ export default function App() {
 
       <div className="print-only">
         <ResumePreview data={data}/>
+      </div>
+      <div className="cl-print-only">
+        <CoverLetterPreview clData={clData} contact={data.contact} authorName={data.name}/>
       </div>
     </>
   );
