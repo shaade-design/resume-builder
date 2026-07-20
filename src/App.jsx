@@ -51,7 +51,7 @@ const INITIAL_DATA = {
   ],
   education: { degree: "B.A. in Graphic Design", school: "North Carolina State University, College of Design", years: "2005–2009" },
   certifications: [ { id: 1, name: "Behavioral Economics Bootcamp Certificate", issuer: "Irrational Labs", year: "Mar 2022" } ],
-  community: { role: "Director of Student Membership", org: "Triangle UXPA", dates: "2017–2020", body: "Facilitated career development programming connecting students to UX professionals; mentored aspiring designers and shared expertise at bootcamps and industry events." },
+  community: [{ id: 1, role: "Director of Student Membership", org: "Triangle UXPA", dates: "2017–2020", body: "Facilitated career development programming connecting students to UX professionals; mentored aspiring designers and shared expertise at bootcamps and industry events." }],
   applications: []
 };
 
@@ -222,14 +222,18 @@ function buildDocx(d) {
         {before:60,after:24}
       )),
     ] : []),
-    section("Community"),
-    para(
-      run(d.community.role,{bold:true,size:18,font:F,color:DARK})+
-      run("  ·  "+d.community.org,{size:18,color:MID,font:F})+
-      run("  ·  "+d.community.dates,{size:17,color:LIGHT,font:F}),
-      {before:60,after:24}
-    ),
-    para(run(d.community.body,{size:18,font:F,color:DARK}),{after:0}),
+    ...((Array.isArray(d.community)?d.community:[d.community]).filter(c=>c&&(c.role||c.org)).length>0?[
+      section("Community"),
+      ...(Array.isArray(d.community)?d.community:[d.community]).filter(c=>c&&(c.role||c.org)).flatMap(c=>[
+        para(
+          run(c.role,{bold:true,size:18,font:F,color:DARK})+
+          (c.org?run("  ·  "+c.org,{size:18,color:MID,font:F}):"")+
+          (c.dates?run("  ·  "+c.dates,{size:17,color:LIGHT,font:F}):""),
+          {before:60,after:24}
+        ),
+        para(run(c.body,{size:18,font:F,color:DARK}),{after:12}),
+      ]),
+    ]:[]),
   ].filter(Boolean).join("\n");
 
   const document=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -373,17 +377,21 @@ function ResumePreview({ data: d }) {
         </div>
       ))}
 
+      {(Array.isArray(d.community)?d.community:[d.community]).filter(c=>c&&c.role).length>0&&<>
       <div className="rp-sec" style={s.sectionHead}>Community</div>
-      <div style={s.comRow}>
-        <div style={s.comHead}>
-          <div>
-            <span style={s.comRole}>{d.community.role}</span>
-            {d.community.org && <span style={s.comOrg}>· {d.community.org}</span>}
+      {(Array.isArray(d.community)?d.community:[d.community]).filter(c=>c&&(c.role||c.org)).map((c,i)=>(
+        <div key={i} style={{...s.comRow,marginBottom:i<d.community.length-1?10:0}}>
+          <div style={s.comHead}>
+            <div>
+              <span style={s.comRole}>{c.role}</span>
+              {c.org && <span style={s.comOrg}>· {c.org}</span>}
+            </div>
+            <span style={s.comDates}>{c.dates}</span>
           </div>
-          <span style={s.comDates}>{d.community.dates}</span>
+          <div style={s.comBody}>{c.body}</div>
         </div>
-        <div style={s.comBody}>{d.community.body}</div>
-      </div>
+      ))}
+      </>}
     </div>
   );
 }
@@ -490,6 +498,11 @@ const OLD_DATA_KEY = "resume-builder:data:v1";
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 function normalizeData(d) {
   d = d || {};
+  const community = Array.isArray(d.community)
+    ? d.community
+    : (d.community && typeof d.community === "object")
+      ? [{ id: 1, ...d.community }]
+      : INITIAL_DATA.community;
   return {
     ...INITIAL_DATA, ...d,
     contact: (d.contact && typeof d.contact === "object") ? { ...INITIAL_DATA.contact, ...d.contact } : INITIAL_DATA.contact,
@@ -497,6 +510,7 @@ function normalizeData(d) {
     applications: Array.isArray(d.applications)
       ? d.applications.map(a => ({ ...a, role: a.role || "Senior Product Designer" }))
       : INITIAL_DATA.applications,
+    community,
   };
 }
 function loadStore() {
@@ -795,6 +809,10 @@ export default function App() {
   const updateCert=(i,u)=>{const c=[...data.certifications];c[i]=u;setData({...data,certifications:c});};
   const deleteCert=i=>setData({...data,certifications:data.certifications.filter((_,j)=>j!==i)});
   const addCert=()=>setData({...data,certifications:[...data.certifications,{id:Date.now(),name:"",issuer:"",year:""}]});
+
+  const updateCommunity=(i,u)=>{const c=[...data.community];c[i]=u;setData({...data,community:c});};
+  const deleteCommunity=i=>setData({...data,community:data.community.filter((_,j)=>j!==i)});
+  const addCommunity=()=>setData({...data,community:[...data.community,{id:Date.now(),role:"",org:"",dates:"",body:""}]});
 
   const updateApp=(id,u)=>setData({...data,applications:data.applications.map(a=>a.id===id?u:a)});
   const deleteApp=id=>setData({...data,applications:data.applications.filter(a=>a.id!==id)});
@@ -1273,16 +1291,24 @@ export default function App() {
                   ))}
                   <button className="add-btn" onClick={addCert}>+ Add certification</button>
                 </div>
-                <div className="job-block">
+                <div className="jobs-header" style={{marginBottom:12}}>
                   {lbl("Community")}
-                  <div className="job-top-row" style={{marginBottom:8}}>
-                    <input className="field job-title" value={data.community.role} onChange={e=>setData({...data,community:{...data.community,role:e.target.value}})} placeholder="Role"/>
-                    <span className="separator">·</span>
-                    <input className="field job-company" value={data.community.org} onChange={e=>setData({...data,community:{...data.community,org:e.target.value}})} placeholder="Organization"/>
-                    <input className="field job-dates" value={data.community.dates} onChange={e=>setData({...data,community:{...data.community,dates:e.target.value}})} placeholder="Years"/>
-                  </div>
-                  <Field multiline value={data.community.body} onChange={v=>setData({...data,community:{...data.community,body:v}})} placeholder="Description..."/>
+                  <button className="add-btn" onClick={addCommunity}>+ Add</button>
                 </div>
+                {data.community.map((c,i)=>(
+                  <div key={c.id} className="job-block" style={{marginBottom:12}}>
+                    <div className="job-header-row">
+                      <div className="job-top-row" style={{flex:1,marginBottom:8}}>
+                        <input className="field job-title" value={c.role} onChange={e=>updateCommunity(i,{...c,role:e.target.value})} placeholder="Role"/>
+                        <span className="separator">·</span>
+                        <input className="field job-company" value={c.org} onChange={e=>updateCommunity(i,{...c,org:e.target.value})} placeholder="Organization"/>
+                        <input className="field job-dates" value={c.dates} onChange={e=>updateCommunity(i,{...c,dates:e.target.value})} placeholder="Years"/>
+                      </div>
+                      <button className="icon-btn delete-btn" onClick={()=>deleteCommunity(i)}>×</button>
+                    </div>
+                    <Field multiline value={c.body} onChange={v=>updateCommunity(i,{...c,body:v})} placeholder="Description..."/>
+                  </div>
+                ))}
               </>}
             </div>
           )}
