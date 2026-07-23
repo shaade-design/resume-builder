@@ -55,7 +55,7 @@ const INITIAL_DATA = {
   applications: []
 };
 
-const APP_STATUSES = ["Applied", "HR Interview", "Design Interview", "Case Study Interview", "Upcoming Interview", "Team Interview", "Final Round", "Rejected", "Ghosted"];
+const APP_STATUSES = ["Applied", "HR Interview", "Design Interview", "Case Study Interview", "Upcoming Interview", "Team Interview", "Final Round", "Ghosted", "Rejected"];
 const STATUS_COLORS = {
   "Applied":              { bg: "#DDE3ED", color: "#1E3A6E" },
   "HR Interview":         { bg: "#DBEAFE", color: "#1D4ED8" },
