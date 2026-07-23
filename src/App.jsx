@@ -55,7 +55,7 @@ const INITIAL_DATA = {
   applications: []
 };
 
-const APP_STATUSES = ["Applied", "HR Interview", "Design Interview", "Case Study Interview", "Upcoming Interview", "Team Interview", "Final Round", "Rejected"];
+const APP_STATUSES = ["Applied", "HR Interview", "Design Interview", "Case Study Interview", "Upcoming Interview", "Team Interview", "Final Round", "Rejected", "Ghosted"];
 const STATUS_COLORS = {
   "Applied":              { bg: "#DDE3ED", color: "#1E3A6E" },
   "HR Interview":         { bg: "#DBEAFE", color: "#1D4ED8" },
@@ -65,6 +65,7 @@ const STATUS_COLORS = {
   "Team Interview":       { bg: "#FFEDD5", color: "#C2410C" },
   "Final Round":          { bg: "#DCFCE7", color: "#166534" },
   "Rejected":             { bg: "#FFE4E6", color: "#9F1239" },
+  "Ghosted":              { bg: "#F3F3F3", color: "#666666" },
 };
 
 const T = {
@@ -816,7 +817,7 @@ export default function App() {
 
   const updateApp=(id,u)=>setData({...data,applications:data.applications.map(a=>a.id===id?u:a)});
   const deleteApp=id=>setData({...data,applications:data.applications.filter(a=>a.id!==id)});
-  const addApp=()=>setData({...data,applications:[{id:Date.now(),company:"",role:"Senior Product Designer",date:new Date().toISOString().slice(0,10),status:"Applied",url:"",notes:""},...data.applications]});
+  const addApp=()=>{const id=Date.now();setData({...data,applications:[{id,company:"",role:"Senior Product Designer",date:new Date().toISOString().slice(0,10),status:"Applied",url:"",notes:""},...data.applications]});setEditingAppId(id);};
   const STATUS_ORDER = {
     "Final Round":0,"Team Interview":1,"Upcoming Interview":2,
     "Case Study Interview":3,"Design Interview":4,"HR Interview":5,
@@ -1525,18 +1526,18 @@ export default function App() {
               {a && (
                 <div className="app-drawer-body">
                   <div className="app-drawer-field">
-                    <div className="app-drawer-label">Status</div>
-                    <select className="field drawer-status-select" style={{background:sc.bg,color:sc.color,fontWeight:700}} value={a.status} onChange={e=>updateApp(a.id,{...a,status:e.target.value})}>
-                      {APP_STATUSES.map(s=><option key={s} value={s} style={{background:"#fff",color:T.dark,fontWeight:400}}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div className="app-drawer-field">
                     <div className="app-drawer-label">Company</div>
-                    <input className="field" value={a.company} onChange={e=>updateApp(a.id,{...a,company:e.target.value})} placeholder="Company name"/>
+                    <input className="field" value={a.company} onChange={e=>updateApp(a.id,{...a,company:e.target.value})} placeholder="Company name" autoFocus/>
                   </div>
                   <div className="app-drawer-field">
                     <div className="app-drawer-label">Role</div>
                     <input className="field" value={a.role} onChange={e=>updateApp(a.id,{...a,role:e.target.value})} placeholder="Role"/>
+                  </div>
+                  <div className="app-drawer-field">
+                    <div className="app-drawer-label">Status</div>
+                    <select className="field drawer-status-select" style={{background:sc.bg,color:sc.color,fontWeight:700}} value={a.status} onChange={e=>updateApp(a.id,{...a,status:e.target.value})}>
+                      {APP_STATUSES.map(s=><option key={s} value={s} style={{background:"#fff",color:T.dark,fontWeight:400}}>{s}</option>)}
+                    </select>
                   </div>
                   <div className="app-drawer-field">
                     <div className="app-drawer-label">Date Applied</div>
