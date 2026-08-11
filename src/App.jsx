@@ -780,6 +780,7 @@ export default function App() {
   const [clStatus, setClStatus] = useState("");
   const [skillDragIdx, setSkillDragIdx] = useState(null);
   const [skillOverIdx, setSkillOverIdx] = useState(null);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const reorderSkills = (from, to) => {
     if (from === to || to === null) return;
     const rows = [...data.skillRows];
@@ -1233,6 +1234,94 @@ export default function App() {
         .app-status-pill { cursor: pointer; -webkit-appearance: none; appearance: none; border: none; border-radius: 999px; padding: 7px 13px; font-size: 12px; font-weight: 700; font-family: inherit; flex-shrink: 0; }
         .app-link-btn { display: inline-flex; align-items: center; gap: 4px; padding: 7px 13px; border-radius: 999px; border: 1.5px solid ${T.dark}; background: white; color: ${T.dark}; font-size: 12px; font-weight: 700; font-family: inherit; text-decoration: none; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
         .app-link-btn:hover { background: ${T.dark}; color: white; }
+
+        /* ── Mobile nav ── */
+        .mobile-nav { display: none; }
+
+        @media (max-width: 768px) {
+          .app { flex-direction: column; height: 100dvh; }
+          .sidebar { display: none; }
+          .right-area { flex: 1; min-height: 0; padding-bottom: 62px; }
+
+          /* Mobile bottom nav */
+          .mobile-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: 62px; padding-bottom: env(safe-area-inset-bottom); background: #EDECE8; border-top: 1px solid ${T.border}; z-index: 100; }
+          .mobile-nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: none; border: none; cursor: pointer; font-family: inherit; font-size: 10px; font-weight: 600; color: #999; letter-spacing: 0.01em; padding: 0; transition: color 0.12s; -webkit-tap-highlight-color: transparent; }
+          .mobile-nav-btn.active { color: ${T.accent}; }
+          .mobile-nav-btn svg { width: 22px; height: 22px; }
+
+          /* Tab bar scrollable */
+          .tabbar { padding: 0 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+          .tabbar::-webkit-scrollbar { display: none; }
+          .tab { padding: 12px 12px 11px; font-size: 13px; }
+
+          /* Main padding */
+          .main { padding: 16px; }
+          .jobs-header { flex-wrap: wrap; gap: 8px; }
+
+          /* Inputs — 16px prevents iOS auto-zoom */
+          .field { font-size: 16px; }
+          .field.bullet-label { font-size: 15px; }
+          .tracker-search { font-size: 16px; }
+
+          /* Contact grid — single column */
+          .contact-grid { grid-template-columns: 1fr; }
+
+          /* Job block — wrap fields */
+          .job-top-row { flex-wrap: wrap; }
+          .separator { display: none; }
+          .field.job-title { flex: 1 1 100%; order: 0; }
+          .field.job-company { flex: 1 1 auto; order: 1; }
+          .field.job-dates { width: auto; min-width: 0; flex: 1 1 auto; order: 2; }
+          .job-sub-row { flex-wrap: wrap; }
+          .field.job-subtitle { flex: 1 1 auto; }
+
+          /* Bullets — hide drag handles (touch drag doesn't work) */
+          .bullet-drag-handle { display: none; }
+
+          /* Preview — stack layout */
+          .preview-layout { flex-direction: column; }
+          .preview-actions { width: 100%; min-width: 0; border-left: none; border-top: 1px solid ${T.border}; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; }
+          .pa-btn { width: auto; flex: 1 1 120px; }
+          .preview-divider { display: none; }
+          .preview-actions-label { display: none; }
+          .preview-scroll { padding: 12px; }
+
+          /* Cover letter — stack */
+          .cl-layout { flex-direction: column; }
+          .cl-preview-actions { width: 100%; flex-shrink: 0; border-left: none; border-top: 1px solid ${T.border}; flex-direction: row; flex-wrap: wrap; gap: 8px; padding: 12px 16px; overflow: visible; }
+          .cl-form-scroll { padding: 16px; max-width: none; }
+          .cl-preview-paper { padding: 32px 20px; }
+          .cl-preview-scroll { padding: 12px; }
+
+          /* Tracker — simplified card */
+          .tracker-col-headers { display: none; }
+          .app-preview { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+          .app-preview-info { flex: 1; min-width: 0; padding-right: 0; }
+          .app-preview-notes { display: none; }
+          .app-preview-status { flex-shrink: 0; }
+          .tracker-filters { gap: 6px; }
+          .filter-pill { padding: 6px 11px; font-size: 12px; }
+
+          /* Drawer — full-width bottom sheet */
+          .app-drawer { width: 100%; top: auto; bottom: 0; transform: translateY(100%); border-radius: 16px 16px 0 0; }
+          .app-drawer.open { transform: translateY(0); }
+
+          /* Versions list */
+          .ver-row { flex-wrap: wrap; }
+
+          /* Mobile More panel */
+          .mobile-more-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 300; }
+          .mobile-more-panel { position: fixed; bottom: 62px; left: 0; right: 0; background: white; border-radius: 20px 20px 0 0; padding: 8px 0 env(safe-area-inset-bottom); z-index: 301; max-height: 75vh; overflow-y: auto; box-shadow: 0 -4px 24px rgba(0,0,0,0.12); }
+          .mobile-more-handle { width: 36px; height: 4px; background: #DDD; border-radius: 2px; margin: 10px auto 12px; }
+          .mobile-more-section { padding: 4px 0; border-bottom: 1px solid ${T.border}; }
+          .mobile-more-section:last-child { border-bottom: none; }
+          .mobile-more-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #AAAAAA; padding: 10px 20px 4px; }
+          .mobile-more-btn { display: block; width: 100%; text-align: left; padding: 14px 20px; font-size: 15px; font-family: inherit; background: none; border: none; color: ${T.dark}; cursor: pointer; font-weight: 500; }
+          .mobile-more-btn.danger { color: #B91C1C; }
+          .mobile-more-btn:active { background: #F5F4F0; }
+          .mobile-more-select { display: block; width: calc(100% - 40px); margin: 4px 20px 12px; background: white; border: 1px solid ${T.border}; border-radius: 8px; padding: 10px 12px; font-size: 15px; font-family: inherit; color: ${T.dark}; -webkit-appearance: none; appearance: none; }
+          .mobile-more-sync { padding: 8px 20px; font-size: 12px; color: #AAAAAA; }
+        }
       `}</style>
 
       <div className="app">
@@ -1629,6 +1718,64 @@ export default function App() {
           )}
 
         </div>
+
+        {/* ── Mobile bottom nav ── */}
+        <nav className="mobile-nav">
+          <button className={`mobile-nav-btn ${(isResumeTab||active==="versions")?"active":""}`} onClick={()=>{setMobileMoreOpen(false);setActive(isResumeTab?"header":"header");}}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Resume
+          </button>
+          <button className={`mobile-nav-btn ${(active==="coverletters"||active==="saved-cls")?"active":""}`} onClick={()=>{setMobileMoreOpen(false);setActive("coverletters");setClTab("content");}}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            Cover Letter
+          </button>
+          <button className={`mobile-nav-btn ${active==="applications"?"active":""}`} onClick={()=>{setMobileMoreOpen(false);setActive("applications");}}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            Tracker
+          </button>
+          <button className={`mobile-nav-btn ${mobileMoreOpen?"active":""}`} onClick={()=>setMobileMoreOpen(o=>!o)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            More
+          </button>
+        </nav>
+
+        {/* ── Mobile More panel ── */}
+        {mobileMoreOpen && (
+          <>
+            <div className="mobile-more-overlay" onClick={()=>setMobileMoreOpen(false)}/>
+            <div className="mobile-more-panel">
+              <div className="mobile-more-handle"/>
+              <div className="mobile-more-section">
+                <div className="mobile-more-label">Resume Version</div>
+                <select className="mobile-more-select" value={store.current} onChange={e=>{switchVersion(e.target.value);setMobileMoreOpen(false);}}>
+                  {store.versions.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+                </select>
+                <button className="mobile-more-btn" onClick={()=>{setMobileMoreOpen(false);setActive("versions");}}>Saved Resumes</button>
+              </div>
+              <div className="mobile-more-section">
+                <div className="mobile-more-label">Cover Letter</div>
+                {(store.clVersions||[]).length > 1 && (
+                  <select className="mobile-more-select" value={store.clCurrent} onChange={e=>switchClVersion(e.target.value)}>
+                    {(store.clVersions||[]).map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+                  </select>
+                )}
+                <button className="mobile-more-btn" onClick={()=>{setMobileMoreOpen(false);setActive("saved-cls");}}>Saved Cover Letters</button>
+              </div>
+              <div className="mobile-more-section">
+                <button className="mobile-more-btn" onClick={()=>{setMobileMoreOpen(false);exportData();}}>Export data ↓</button>
+                <button className="mobile-more-btn" onClick={()=>{setMobileMoreOpen(false);importData();}}>Import data ↑</button>
+                <button className="mobile-more-btn" onClick={()=>{setMobileMoreOpen(false);resetVersion();}}>Reset to sample</button>
+              </div>
+              <div className="mobile-more-section">
+                {syncStatus==="saving"&&<div className="mobile-more-sync">Syncing…</div>}
+                {syncStatus==="saved"&&<div className="mobile-more-sync" style={{color:"#4CAF50"}}>Saved ✓</div>}
+                <div className="mobile-more-sync">{session?.user?.email}</div>
+                <button className="mobile-more-btn danger" onClick={()=>supabase.auth.signOut()}>Sign out</button>
+              </div>
+            </div>
+          </>
+        )}
+
       </div>
 
       {/* ── App edit drawer ── */}
