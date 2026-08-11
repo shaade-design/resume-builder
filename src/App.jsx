@@ -741,6 +741,7 @@ export default function App() {
 
   const [appSort, setAppSort] = useState({ key: "date", dir: "desc" });
   const [trackerFilter, setTrackerFilter] = useState("all");
+  const [appSearch, setAppSearch] = useState("");
   const [editingAppId, setEditingAppId] = useState(null);
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") setEditingAppId(null); };
@@ -862,12 +863,19 @@ export default function App() {
     if (id==="rejected") return applications.filter(a=>a.status==="Rejected").length;
     return 0;
   };
+  const appSearchLower = appSearch.toLowerCase();
   const sortedApps=[...applications]
     .filter(a => {
       if (trackerFilter==="applied") return a.status==="Applied";
       if (trackerFilter==="active") return FILTER_ACTIVE.includes(a.status);
       if (trackerFilter==="rejected") return a.status==="Rejected";
       return true;
+    })
+    .filter(a => {
+      if (!appSearchLower) return true;
+      return (a.company||"").toLowerCase().includes(appSearchLower)
+        || (a.role||"").toLowerCase().includes(appSearchLower)
+        || (a.notes||"").toLowerCase().includes(appSearchLower);
     })
     .sort((a,b)=>{
       if (appSort.key==="status") {
@@ -1086,6 +1094,12 @@ export default function App() {
         /* ── Application tracker ── */
         .apps-empty { font-size: 13px; color: ${T.light}; padding: 14px 2px; line-height: 1.5; }
 
+        .tracker-search-wrap { position: relative; margin-bottom: 14px; }
+        .tracker-search { width: 100%; padding: 8px 32px 8px 30px; border: 1px solid ${T.border}; border-radius: 8px; font-size: 13px; font-family: inherit; background: white; color: ${T.dark}; outline: none; }
+        .tracker-search:focus { border-color: ${T.accent}; }
+        .tracker-search::placeholder { color: #BBBBBB; }
+        .tracker-search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px; color: #AAAAAA; line-height: 1; padding: 0 2px; }
+        .tracker-search-clear:hover { color: ${T.dark}; }
         .tracker-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
         .filter-pill { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600; border: 1.5px solid ${T.border}; background: white; cursor: pointer; font-family: inherit; color: ${T.mid}; transition: all 0.15s; }
         .filter-pill:hover { border-color: ${T.dark}; color: ${T.dark}; }
@@ -1464,6 +1478,19 @@ export default function App() {
               <div className="jobs-header">
                 <div className="section-title" style={{marginBottom:0}}>Application Tracker</div>
                 <button className="add-btn" onClick={addApp}>+ Add application</button>
+              </div>
+
+              {/* Search */}
+              <div className="tracker-search-wrap">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"#AAAAAA",pointerEvents:"none"}}><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5"/><path d="M10 10l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                <input
+                  className="tracker-search"
+                  type="text"
+                  placeholder="Search company, role, or notes…"
+                  value={appSearch}
+                  onChange={e=>setAppSearch(e.target.value)}
+                />
+                {appSearch && <button className="tracker-search-clear" onClick={()=>setAppSearch("")}>×</button>}
               </div>
 
               {/* Filter pills */}
