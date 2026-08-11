@@ -526,7 +526,22 @@ function loadStore() {
           ? s.clVersions
           : [{ id: newId(), name: "New Cover Letter", data: { ...INITIAL_CL_DATA, date: new Date().toISOString().slice(0, 10) } }];
         const clCurrent = clVersions.some(v => v.id === s.clCurrent) ? s.clCurrent : clVersions[0].id;
-        return { versions, current, clVersions, clCurrent };
+        // Migrate applications from per-version storage to shared top-level store
+        let applications;
+        if (Array.isArray(s.applications)) {
+          applications = s.applications.map(a => ({ ...a, role: a.role || "Senior Product Designer" }));
+        } else {
+          const seen = new Map();
+          for (const v of s.versions) {
+            if (Array.isArray(v.data?.applications)) {
+              for (const a of v.data.applications) {
+                if (!seen.has(a.id)) seen.set(a.id, { ...a, role: a.role || "Senior Product Designer" });
+              }
+            }
+          }
+          applications = [...seen.values()].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+        }
+        return { versions, current, clVersions, clCurrent, applications };
       }
     }
     const oldRaw = window.localStorage.getItem(OLD_DATA_KEY);
@@ -535,13 +550,16 @@ function loadStore() {
       if (parsed && Array.isArray(parsed.jobs)) {
         const v = { id: newId(), name: "My Resume", data: normalizeData(parsed) };
         const clV = { id: newId(), name: "New Cover Letter", data: { ...INITIAL_CL_DATA, date: new Date().toISOString().slice(0, 10) } };
-        return { versions: [v], current: v.id, clVersions: [clV], clCurrent: clV.id };
+        const applications = Array.isArray(parsed.applications)
+          ? parsed.applications.map(a => ({ ...a, role: a.role || "Senior Product Designer" }))
+          : [];
+        return { versions: [v], current: v.id, clVersions: [clV], clCurrent: clV.id, applications };
       }
     }
   } catch (e) { /* ignore */ }
   const v = { id: newId(), name: "My Resume", data: INITIAL_DATA };
   const clV = { id: newId(), name: "New Cover Letter", data: { ...INITIAL_CL_DATA, date: new Date().toISOString().slice(0, 10) } };
-  return { versions: [v], current: v.id, clVersions: [clV], clCurrent: clV.id };
+  return { versions: [v], current: v.id, clVersions: [clV], clCurrent: clV.id, applications: [] };
 }
 
 function buildClDocx(clData, contact, authorName) {
@@ -815,9 +833,11 @@ export default function App() {
   const deleteCommunity=i=>setData({...data,community:data.community.filter((_,j)=>j!==i)});
   const addCommunity=()=>setData({...data,community:[...data.community,{id:Date.now(),role:"",org:"",dates:"",body:""}]});
 
-  const updateApp=(id,u)=>setData({...data,applications:data.applications.map(a=>a.id===id?u:a)});
-  const deleteApp=id=>setData({...data,applications:data.applications.filter(a=>a.id!==id)});
-  const addApp=()=>{const id=Date.now();setData({...data,applications:[{id,company:"",role:"Senior Product Designer",date:new Date().toISOString().slice(0,10),status:"Applied",url:"",notes:""},...data.applications]});setEditingAppId(id);};
+  const applications = store.applications || [];
+  const setApplications = (apps) => setStore(s => ({ ...s, applications: apps }));
+  const updateApp=(id,u)=>setApplications(applications.map(a=>a.id===id?u:a));
+  const deleteApp=id=>setApplications(applications.filter(a=>a.id!==id));
+  const addApp=()=>{const id=Date.now();setApplications([{id,company:"",role:"Senior Product Designer",date:new Date().toISOString().slice(0,10),status:"Applied",url:"",notes:""},...applications]);setEditingAppId(id);};
   const STATUS_ORDER = {
     "Final Round":0,"Team Interview":1,"Upcoming Interview":2,
     "Case Study Interview":3,"Design Interview":4,"HR Interview":5,
@@ -836,13 +856,13 @@ export default function App() {
     { id:"rejected", label:"Rejected" },
   ];
   const filterCount = (id) => {
-    if (id==="all") return data.applications.length;
-    if (id==="applied") return data.applications.filter(a=>a.status==="Applied").length;
-    if (id==="active") return data.applications.filter(a=>FILTER_ACTIVE.includes(a.status)).length;
-    if (id==="rejected") return data.applications.filter(a=>a.status==="Rejected").length;
+    if (id==="all") return applications.length;
+    if (id==="applied") return applications.filter(a=>a.status==="Applied").length;
+    if (id==="active") return applications.filter(a=>FILTER_ACTIVE.includes(a.status)).length;
+    if (id==="rejected") return applications.filter(a=>a.status==="Rejected").length;
     return 0;
   };
-  const sortedApps=[...data.applications]
+  const sortedApps=[...applications]
     .filter(a => {
       if (trackerFilter==="applied") return a.status==="Applied";
       if (trackerFilter==="active") return FILTER_ACTIVE.includes(a.status);
@@ -1467,7 +1487,7 @@ export default function App() {
                 </div>
               </div>
 
-              {data.applications.length===0
+              {applications.length===0
                 ? <div className="section-card"><div className="apps-empty">No applications yet. Click <strong>+ Add application</strong> to start tracking.</div></div>
                 : sortedApps.length===0
                   ? <div className="section-card"><div className="apps-empty">No applications match this filter.</div></div>
@@ -1512,7 +1532,7 @@ export default function App() {
 
       {/* ── App edit drawer ── */}
       {(() => {
-        const a = data.applications.find(x => x.id === editingAppId);
+        const a = applications.find(x => x.id === editingAppId);
         const sc = a ? (STATUS_COLORS[a.status] || STATUS_COLORS["Applied"]) : null;
         const isOpen = !!a;
         return (
