@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { supabase } from "./supabase";
 
 const INITIAL_DATA = {
   name: "Shaade Oliveros-Tavares",
@@ -514,35 +515,43 @@ function normalizeData(d) {
     community,
   };
 }
+function parseStore(s) {
+  if (!s || !Array.isArray(s.versions) || !s.versions.length) return null;
+  const versions = s.versions.map(v => ({ id: v.id || newId(), name: v.name || "Untitled", data: normalizeData(v.data) }));
+  const current = versions.some(v => v.id === s.current) ? s.current : versions[0].id;
+  const clVersions = Array.isArray(s.clVersions) && s.clVersions.length
+    ? s.clVersions
+    : [{ id: newId(), name: "New Cover Letter", data: { ...INITIAL_CL_DATA, date: new Date().toISOString().slice(0, 10) } }];
+  const clCurrent = clVersions.some(v => v.id === s.clCurrent) ? s.clCurrent : clVersions[0].id;
+  let applications;
+  if (Array.isArray(s.applications)) {
+    applications = s.applications.map(a => ({ ...a, role: a.role || "Senior Product Designer" }));
+  } else {
+    const seen = new Map();
+    for (const v of s.versions) {
+      if (Array.isArray(v.data?.applications)) {
+        for (const a of v.data.applications) {
+          if (!seen.has(a.id)) seen.set(a.id, { ...a, role: a.role || "Senior Product Designer" });
+        }
+      }
+    }
+    applications = [...seen.values()].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  }
+  return { versions, current, clVersions, clCurrent, applications };
+}
+
+function freshStore() {
+  const v = { id: newId(), name: "My Resume", data: INITIAL_DATA };
+  const clV = { id: newId(), name: "New Cover Letter", data: { ...INITIAL_CL_DATA, date: new Date().toISOString().slice(0, 10) } };
+  return { versions: [v], current: v.id, clVersions: [clV], clCurrent: clV.id, applications: [] };
+}
+
 function loadStore() {
   try {
     const raw = window.localStorage.getItem(STORE_KEY);
     if (raw) {
-      const s = JSON.parse(raw);
-      if (s && Array.isArray(s.versions) && s.versions.length) {
-        const versions = s.versions.map(v => ({ id: v.id || newId(), name: v.name || "Untitled", data: normalizeData(v.data) }));
-        const current = versions.some(v => v.id === s.current) ? s.current : versions[0].id;
-        const clVersions = Array.isArray(s.clVersions) && s.clVersions.length
-          ? s.clVersions
-          : [{ id: newId(), name: "New Cover Letter", data: { ...INITIAL_CL_DATA, date: new Date().toISOString().slice(0, 10) } }];
-        const clCurrent = clVersions.some(v => v.id === s.clCurrent) ? s.clCurrent : clVersions[0].id;
-        // Migrate applications from per-version storage to shared top-level store
-        let applications;
-        if (Array.isArray(s.applications)) {
-          applications = s.applications.map(a => ({ ...a, role: a.role || "Senior Product Designer" }));
-        } else {
-          const seen = new Map();
-          for (const v of s.versions) {
-            if (Array.isArray(v.data?.applications)) {
-              for (const a of v.data.applications) {
-                if (!seen.has(a.id)) seen.set(a.id, { ...a, role: a.role || "Senior Product Designer" });
-              }
-            }
-          }
-          applications = [...seen.values()].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-        }
-        return { versions, current, clVersions, clCurrent, applications };
-      }
+      const parsed = parseStore(JSON.parse(raw));
+      if (parsed) return parsed;
     }
     const oldRaw = window.localStorage.getItem(OLD_DATA_KEY);
     if (oldRaw) {
@@ -557,9 +566,7 @@ function loadStore() {
       }
     }
   } catch (e) { /* ignore */ }
-  const v = { id: newId(), name: "My Resume", data: INITIAL_DATA };
-  const clV = { id: newId(), name: "New Cover Letter", data: { ...INITIAL_CL_DATA, date: new Date().toISOString().slice(0, 10) } };
-  return { versions: [v], current: v.id, clVersions: [clV], clCurrent: clV.id, applications: [] };
+  return freshStore();
 }
 
 function buildClDocx(clData, contact, authorName) {
@@ -711,8 +718,50 @@ const RESUME_TAB_IDS = RESUME_TABS.map(t => t.id);
 
 export default function App() {
   const [store, setStore] = useState(loadStore);
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState("");
+  const syncTimer = useRef(null);
+
+  // Auth init
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load from cloud when user signs in
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    (async () => {
+      const { data } = await supabase.from("user_data").select("store").eq("id", session.user.id).single();
+      if (data?.store) {
+        const parsed = parseStore(data.store);
+        if (parsed) { setStore(parsed); return; }
+      }
+      // No cloud data yet — upload what's in localStorage
+      const current = loadStore();
+      setStore(current);
+      await supabase.from("user_data").upsert({ id: session.user.id, store: current, updated_at: new Date().toISOString() });
+    })();
+  }, [session?.user?.id]);
+
+  // Save to localStorage + debounced save to Supabase
   useEffect(() => {
     try { window.localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* ignore */ }
+    if (!session?.user?.id) return;
+    clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(async () => {
+      setSyncStatus("saving");
+      await supabase.from("user_data").upsert({ id: session.user.id, store, updated_at: new Date().toISOString() });
+      setSyncStatus("saved");
+      setTimeout(() => setSyncStatus(""), 2500);
+    }, 1500);
   }, [store]);
 
   const current = store.versions.find(v => v.id === store.current) || store.versions[0];
@@ -950,6 +999,26 @@ export default function App() {
   };
 
   const lbl = text => <label style={{fontSize:11,color:"#888",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:12}}>{text}</label>;
+
+  if (authLoading) return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#F7F6F2",fontFamily:"'Inter',-apple-system,sans-serif"}}>
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:"#AAAAAA"}}>Loading…</div>
+    </div>
+  );
+
+  if (!session) return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#F7F6F2",fontFamily:"'Inter',-apple-system,sans-serif",flexDirection:"column",gap:12}}>
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:"#1C1C1E",marginBottom:12}}>Resume Builder</div>
+      <div style={{fontSize:24,fontWeight:300,color:"#D34F2F",letterSpacing:"-0.02em",marginBottom:4}}>Sign in to continue</div>
+      <div style={{fontSize:13,color:"#909094",marginBottom:28}}>Your data syncs securely across all your devices.</div>
+      <button
+        onClick={()=>supabase.auth.signInWithOAuth({provider:"github",options:{redirectTo:window.location.href}})}
+        style={{display:"flex",alignItems:"center",gap:10,background:"#24292e",color:"white",border:"none",borderRadius:8,padding:"12px 24px",fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.014-1.703-2.782.603-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+        Sign in with GitHub
+      </button>
+    </div>
+  );
 
   return (
     <>
@@ -1209,6 +1278,11 @@ export default function App() {
             <button className="sidebar-export" onClick={exportData}>Export data ↓</button>
             <button className="sidebar-export" onClick={importData}>Import data ↑</button>
             <button className="sidebar-reset" onClick={resetVersion}>Reset to sample</button>
+            <div style={{height:1,background:T.border,margin:"4px 0"}}/>
+            {syncStatus==="saving"&&<div style={{fontSize:11,color:"#AAAAAA"}}>Syncing…</div>}
+            {syncStatus==="saved"&&<div style={{fontSize:11,color:"#4CAF50"}}>Saved ✓</div>}
+            <div style={{fontSize:11,color:"#AAAAAA",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{session?.user?.email}</div>
+            <button className="sidebar-reset" onClick={()=>supabase.auth.signOut()}>Sign out</button>
           </div>
         </div>
 
