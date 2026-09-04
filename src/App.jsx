@@ -1079,6 +1079,7 @@ export default function App() {
           html, body, #root { background: #FFFFFF !important; }
           body * { background-color: transparent; }
           .app { display: none !important; }
+          .app-drawer, .app-drawer-overlay { display: none !important; }
           /* Resume print (default when no data-printing, or data-printing=resume) */
           body:not([data-printing="cl"]) .print-only { display: block !important; }
           body:not([data-printing="cl"]) .print-only > div { background: #FFFFFF !important; max-width: none !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
