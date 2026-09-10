@@ -56,7 +56,7 @@ const INITIAL_DATA = {
   applications: []
 };
 
-const APP_STATUSES = ["Applied", "HR Interview", "Design Interview", "Case Study Interview", "Upcoming Interview", "Team Interview", "Final Round", "Ghosted", "Rejected"];
+const APP_STATUSES = ["Applied", "HR Interview", "Design Interview", "Case Study Interview", "Upcoming Interview", "Team Interview", "Final Round", "Ghosted", "Passed on", "Rejected"];
 const STATUS_COLORS = {
   "Applied":              { bg: "#DDE3ED", color: "#1E3A6E" },
   "HR Interview":         { bg: "#DBEAFE", color: "#1D4ED8" },
@@ -65,6 +65,7 @@ const STATUS_COLORS = {
   "Upcoming Interview":   { bg: "#CFFAFE", color: "#0E7490" },
   "Team Interview":       { bg: "#FFEDD5", color: "#C2410C" },
   "Final Round":          { bg: "#DCFCE7", color: "#166534" },
+  "Passed on":            { bg: "#FDF2FF", color: "#7E22CE" },
   "Rejected":             { bg: "#FFE4E6", color: "#9F1239" },
   "Ghosted":              { bg: "#F3F3F3", color: "#666666" },
 };
@@ -892,7 +893,7 @@ export default function App() {
   const STATUS_ORDER = {
     "Final Round":0,"Team Interview":1,"Upcoming Interview":2,
     "Case Study Interview":3,"Design Interview":4,"HR Interview":5,
-    "Applied":6,"Rejected":7
+    "Applied":6,"Passed on":7,"Rejected":8
   };
   // Status defaults to asc (most positive first); Date defaults to desc (newest first)
   const setAppSortKey = (key) => setAppSort(s => ({
@@ -904,13 +905,14 @@ export default function App() {
     { id:"all", label:"All" },
     { id:"applied", label:"Applied" },
     { id:"active", label:"Interviewing" },
-    { id:"rejected", label:"Rejected" },
+    { id:"rejected", label:"Not selected" },
   ];
+  const FILTER_NOT_SELECTED = ["Rejected","Passed on"];
   const filterCount = (id) => {
     if (id==="all") return applications.length;
     if (id==="applied") return applications.filter(a=>a.status==="Applied").length;
     if (id==="active") return applications.filter(a=>FILTER_ACTIVE.includes(a.status)).length;
-    if (id==="rejected") return applications.filter(a=>a.status==="Rejected").length;
+    if (id==="rejected") return applications.filter(a=>FILTER_NOT_SELECTED.includes(a.status)).length;
     return 0;
   };
   const appSearchLower = appSearch.toLowerCase();
@@ -918,7 +920,7 @@ export default function App() {
     .filter(a => {
       if (trackerFilter==="applied") return a.status==="Applied";
       if (trackerFilter==="active") return FILTER_ACTIVE.includes(a.status);
-      if (trackerFilter==="rejected") return a.status==="Rejected";
+      if (trackerFilter==="rejected") return FILTER_NOT_SELECTED.includes(a.status);
       return true;
     })
     .filter(a => {
@@ -1202,6 +1204,13 @@ export default function App() {
         .app-preview-notes { font-size: 12.5px; color: ${T.mid}; padding-right: 16px; font-style: italic; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
         .app-preview-notes.empty { color: #CCCCCC; font-style: normal; }
         .app-status-badge { display: inline-block; padding: 6px 13px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; letter-spacing: 0.01em; }
+        .app-rounds { display: flex; gap: 4px; align-items: center; margin-top: 5px; justify-content: flex-end; }
+        .app-round-dot { width: 20px; height: 20px; border-radius: 50%; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; background: #F0EFEB; color: ${T.light}; flex-shrink: 0; }
+        .app-round-dot.filled { background: #D34F2F22; color: #D34F2F; }
+        .rounds-selector { display: flex; gap: 6px; align-items: center; }
+        .rounds-btn { width: 28px; height: 28px; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #E5E3DE; background: white; color: ${T.light}; transition: all 0.12s; font-family: inherit; }
+        .rounds-btn:hover { border-color: #D34F2F; color: #D34F2F; }
+        .rounds-btn.active { background: #D34F2F; border-color: #D34F2F; color: white; }
         .app-preview-apply { display: flex; }
         .app-preview-status { display: flex; justify-content: flex-end; }
 
@@ -1707,7 +1716,16 @@ export default function App() {
                                 {a.notes || "+ Add note"}
                               </div>
                               <div className="app-preview-status">
-                                <span className="app-status-badge" style={{background:sc.bg,color:sc.color}}>{a.status}</span>
+                                <div>
+                                  <span className="app-status-badge" style={{background:sc.bg,color:sc.color}}>{a.status}</span>
+                                  {(a.status==="Rejected"||a.status==="Passed on") && a.rounds > 0 && (
+                                    <div className="app-rounds">
+                                      {[1,2,3,4,5].map(n=>(
+                                        <div key={n} className={`app-round-dot${n<=a.rounds?" filled":""}`}>{n}</div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1808,6 +1826,25 @@ export default function App() {
                       {APP_STATUSES.map(s=><option key={s} value={s} style={{background:"#fff",color:T.dark,fontWeight:400}}>{s}</option>)}
                     </select>
                   </div>
+                  {(a.status==="Rejected"||a.status==="Passed on") && (
+                    <div className="app-drawer-field">
+                      <div className="app-drawer-label">Rounds reached</div>
+                      <div className="rounds-selector">
+                        {[1,2,3,4,5].map(n=>(
+                          <button key={n} className={`rounds-btn${(a.rounds||0)===n?" active":""}`}
+                            onClick={()=>updateApp(a.id,{...a,rounds:(a.rounds||0)===n?0:n})}>
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {(a.status==="Rejected"||a.status==="Passed on") && (
+                    <div className="app-drawer-field">
+                      <div className="app-drawer-label">Notes</div>
+                      <textarea className="field app-drawer-notes" value={a.rejectionNote||""} onChange={e=>updateApp(a.id,{...a,rejectionNote:e.target.value})} placeholder="What happened? What would you do differently?"/>
+                    </div>
+                  )}
                   <div className="app-drawer-field">
                     <div className="app-drawer-label">Date Applied</div>
                     <DateField value={a.date} onChange={e=>updateApp(a.id,{...a,date:e.target.value})}/>
