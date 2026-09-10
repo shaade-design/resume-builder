@@ -57,6 +57,7 @@ const INITIAL_DATA = {
 };
 
 const APP_STATUSES = ["Applied", "HR Interview", "Design Interview", "Case Study Interview", "Upcoming Interview", "Team Interview", "Final Round", "Ghosted", "Passed on", "Rejected"];
+const ROUNDS_STATUSES = ["HR Interview","Design Interview","Case Study Interview","Upcoming Interview","Team Interview","Final Round","Ghosted","Passed on","Rejected"];
 const STATUS_COLORS = {
   "Applied":              { bg: "#DDE3ED", color: "#1E3A6E" },
   "HR Interview":         { bg: "#DBEAFE", color: "#1D4ED8" },
@@ -1206,11 +1207,11 @@ export default function App() {
         .app-status-badge { display: inline-block; padding: 6px 13px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; letter-spacing: 0.01em; }
         .app-rounds { display: flex; gap: 4px; align-items: center; margin-top: 5px; justify-content: flex-end; }
         .app-round-dot { width: 20px; height: 20px; border-radius: 50%; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; background: #F0EFEB; color: ${T.light}; flex-shrink: 0; }
-        .app-round-dot.filled { background: #D34F2F22; color: #D34F2F; }
+        .app-round-dot.filled { background: var(--round-bg, #D34F2F22); color: var(--round-color, #D34F2F); }
         .rounds-selector { display: flex; gap: 6px; align-items: center; }
         .rounds-btn { width: 28px; height: 28px; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #E5E3DE; background: white; color: ${T.light}; transition: all 0.12s; font-family: inherit; }
-        .rounds-btn:hover { border-color: #D34F2F; color: #D34F2F; }
-        .rounds-btn.active { background: #D34F2F; border-color: #D34F2F; color: white; }
+        .rounds-btn:hover { border-color: var(--round-color, #D34F2F); color: var(--round-color, #D34F2F); }
+        .rounds-btn.active { background: var(--round-color, #D34F2F); border-color: var(--round-color, #D34F2F); color: white; }
         .app-preview-apply { display: flex; }
         .app-preview-status { display: flex; justify-content: flex-end; }
 
@@ -1718,8 +1719,8 @@ export default function App() {
                               <div className="app-preview-status">
                                 <div>
                                   <span className="app-status-badge" style={{background:sc.bg,color:sc.color}}>{a.status}</span>
-                                  {(a.status==="Rejected"||a.status==="Passed on") && a.rounds > 0 && (
-                                    <div className="app-rounds">
+                                  {ROUNDS_STATUSES.includes(a.status) && a.rounds > 0 && (
+                                    <div className="app-rounds" style={{"--round-bg":sc.color+"22","--round-color":sc.color}}>
                                       {[1,2,3,4,5].map(n=>(
                                         <div key={n} className={`app-round-dot${n<=a.rounds?" filled":""}`}>{n}</div>
                                       ))}
@@ -1826,10 +1827,10 @@ export default function App() {
                       {APP_STATUSES.map(s=><option key={s} value={s} style={{background:"#fff",color:T.dark,fontWeight:400}}>{s}</option>)}
                     </select>
                   </div>
-                  {(a.status==="Rejected"||a.status==="Passed on") && (
+                  {ROUNDS_STATUSES.includes(a.status) && (
                     <div className="app-drawer-field">
                       <div className="app-drawer-label">Rounds reached</div>
-                      <div className="rounds-selector">
+                      <div className="rounds-selector" style={{"--round-color":sc.color}}>
                         {[1,2,3,4,5].map(n=>(
                           <button key={n} className={`rounds-btn${(a.rounds||0)===n?" active":""}`}
                             onClick={()=>updateApp(a.id,{...a,rounds:(a.rounds||0)===n?0:n})}>
@@ -1839,7 +1840,7 @@ export default function App() {
                       </div>
                     </div>
                   )}
-                  {(a.status==="Rejected"||a.status==="Passed on") && (
+                  {ROUNDS_STATUSES.includes(a.status) && (
                     <div className="app-drawer-field">
                       <div className="app-drawer-label">Notes</div>
                       <textarea className="field app-drawer-notes" value={a.rejectionNote||""} onChange={e=>updateApp(a.id,{...a,rejectionNote:e.target.value})} placeholder="What happened? What would you do differently?"/>
