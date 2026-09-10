@@ -1721,9 +1721,10 @@ export default function App() {
                                   <span className="app-status-badge" style={{background:sc.bg,color:sc.color}}>{a.status}</span>
                                   {ROUNDS_STATUSES.includes(a.status) && a.rounds > 0 && (
                                     <div className="app-rounds" style={{"--round-bg":sc.color+"22","--round-color":sc.color}}>
-                                      {[1,2,3,4,5].map(n=>(
+                                      {[1,2,3,4,5,6].map(n=>(
                                         <div key={n} className={`app-round-dot${n<=a.rounds?" filled":""}`}>{n}</div>
                                       ))}
+                                      {a.rounds > 6 && <div className="app-round-dot filled">+</div>}
                                     </div>
                                   )}
                                 </div>
@@ -1831,12 +1832,16 @@ export default function App() {
                     <div className="app-drawer-field">
                       <div className="app-drawer-label">Rounds reached</div>
                       <div className="rounds-selector" style={{"--round-color":sc.color}}>
-                        {[1,2,3,4,5].map(n=>(
+                        {[1,2,3,4,5,6].map(n=>(
                           <button key={n} className={`rounds-btn${(a.rounds||0)===n?" active":""}`}
                             onClick={()=>updateApp(a.id,{...a,rounds:(a.rounds||0)===n?0:n})}>
                             {n}
                           </button>
                         ))}
+                        <button className={`rounds-btn${(a.rounds||0)>6?" active":""}`}
+                          onClick={()=>updateApp(a.id,{...a,rounds:(a.rounds||0)>6?0:7})}>
+                          +
+                        </button>
                       </div>
                     </div>
                   )}
