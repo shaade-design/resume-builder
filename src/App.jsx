@@ -58,6 +58,16 @@ const INITIAL_DATA = {
 
 const APP_STATUSES = ["Applied", "HR Interview", "Design Interview", "Case Study Interview", "Upcoming Interview", "Team Interview", "Final Round", "Ghosted", "Passed on", "Rejected"];
 const ROUNDS_STATUSES = ["HR Interview","Design Interview","Case Study Interview","Upcoming Interview","Team Interview","Final Round","Ghosted","Passed on","Rejected"];
+const ATS_PLATFORMS = [
+  { id:"greenhouse",      label:"Greenhouse",          color:"#27B768" },
+  { id:"workday",         label:"Workday",              color:"#0875E1" },
+  { id:"linkedin",        label:"LinkedIn Easy Apply",  color:"#0A66C2" },
+  { id:"lever",           label:"Lever",                color:"#7B5EEA" },
+  { id:"ashby",           label:"Ashby",                color:"#3B7CDE" },
+  { id:"indeed",          label:"Indeed",               color:"#2164F3" },
+  { id:"other",           label:"Other",                color:"#909094" },
+];
+const ATS_MAP = Object.fromEntries(ATS_PLATFORMS.map(p=>[p.id,p]));
 const STATUS_COLORS = {
   "Applied":              { bg: "#DDE3ED", color: "#1E3A6E" },
   "HR Interview":         { bg: "#DBEAFE", color: "#1D4ED8" },
@@ -890,7 +900,7 @@ export default function App() {
   const setApplications = (apps) => setStore(s => ({ ...s, applications: apps }));
   const updateApp=(id,u)=>setApplications(applications.map(a=>a.id===id?u:a));
   const deleteApp=id=>setApplications(applications.filter(a=>a.id!==id));
-  const addApp=()=>{const id=Date.now();setApplications([{id,company:"",role:"Senior Product Designer",date:new Date().toISOString().slice(0,10),status:"Applied",url:"",notes:""},...applications]);setEditingAppId(id);};
+  const addApp=()=>{const id=Date.now();setApplications([{id,company:"",role:"Senior Product Designer",date:new Date().toISOString().slice(0,10),status:"Applied",url:"",notes:"",ats:""},...applications]);setEditingAppId(id);};
   const STATUS_ORDER = {
     "Final Round":0,"Team Interview":1,"Upcoming Interview":2,
     "Case Study Interview":3,"Design Interview":4,"HR Interview":5,
@@ -1214,6 +1224,8 @@ export default function App() {
         .rounds-btn.active { background: var(--round-color, #D34F2F); border-color: var(--round-color, #D34F2F); color: white; }
         .app-preview-apply { display: flex; }
         .app-preview-status { display: flex; justify-content: flex-end; }
+        .ats-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 20px; margin-top: 3px; }
+        .ats-tag-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
         /* ── Drawer ── */
         .app-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.18); z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.22s; }
@@ -1712,6 +1724,12 @@ export default function App() {
                                 <div className="app-preview-title">{a.company||<span style={{color:T.light}}>Company</span>}</div>
                                 <div className="app-preview-sub">{a.role||<span style={{color:T.light}}>Role</span>}</div>
                                 {ago && <div className="app-preview-meta">Applied {ago}</div>}
+                                {a.ats && ATS_MAP[a.ats] && (
+                                  <div className="ats-tag" style={{background:ATS_MAP[a.ats].color+"18",color:ATS_MAP[a.ats].color}}>
+                                    <div className="ats-tag-dot" style={{background:ATS_MAP[a.ats].color}}/>
+                                    {ATS_MAP[a.ats].label}
+                                  </div>
+                                )}
                               </div>
                               <div className={`app-preview-notes${a.notes?"":" empty"}`}>
                                 {a.notes || "+ Add note"}
@@ -1858,6 +1876,13 @@ export default function App() {
                   <div className="app-drawer-field">
                     <div className="app-drawer-label">Job URL</div>
                     <input className="field" value={a.url} onChange={e=>updateApp(a.id,{...a,url:e.target.value})} placeholder="https://…"/>
+                  </div>
+                  <div className="app-drawer-field">
+                    <div className="app-drawer-label">Application Platform</div>
+                    <select className="field" value={a.ats||""} onChange={e=>updateApp(a.id,{...a,ats:e.target.value})}>
+                      <option value="">— Not set —</option>
+                      {ATS_PLATFORMS.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}
+                    </select>
                   </div>
                   <div className="app-drawer-field">
                     <div className="app-drawer-label">Notes</div>
