@@ -834,7 +834,7 @@ export default function App() {
   };
 
   // Save a snapshot of current state — stays on current version, snapshot goes to the list
-  const saveSnapshot = () => setSnapshotModal({ label: current.name, company: "", role: "" });
+  const saveSnapshot = () => setSnapshotModal({ label: current.name, company: "", role: data.title || "" });
 
   const confirmSnapshot = ({ label, company, role }) => {
     const snapName = [company, role].filter(Boolean).join(" — ") || label.trim() || current.name;
@@ -1234,6 +1234,10 @@ export default function App() {
         .rounds-btn.active { background: var(--round-color, #D34F2F); border-color: var(--round-color, #D34F2F); color: white; }
         .app-preview-apply { display: flex; }
         .app-preview-status { display: flex; justify-content: flex-end; }
+        .app-resume-link { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 6px; border: 1px solid ${T.border}; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+        .app-resume-link:hover { border-color: #D34F2F; background: #FFF7F5; }
+        .app-resume-link-name { font-size: 12.5px; font-weight: 600; color: ${T.dark}; }
+        .app-resume-link-arrow { font-size: 13px; color: #D34F2F; }
         .ats-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 20px; margin-top: 3px; }
         .ats-tag-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
@@ -1908,6 +1912,18 @@ export default function App() {
                     <div className="app-drawer-label">Notes</div>
                     <textarea className="field app-drawer-notes" value={a.notes} onChange={e=>updateApp(a.id,{...a,notes:e.target.value})} placeholder="Any notes…"/>
                   </div>
+                  {(() => {
+                    const snap = a.snapshotId && store.versions.find(v=>v.id===a.snapshotId);
+                    return snap ? (
+                      <div className="app-drawer-field">
+                        <div className="app-drawer-label">Resume Used</div>
+                        <div className="app-resume-link" onClick={()=>{setStore(s=>({...s,current:snap.id}));setActive("header");setEditingAppId(null);}}>
+                          <span className="app-resume-link-name">{snap.name}</span>
+                          <span className="app-resume-link-arrow">→</span>
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
               )}
               <div className="app-drawer-footer">
