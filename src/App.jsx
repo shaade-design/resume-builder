@@ -65,6 +65,8 @@ const ATS_PLATFORMS = [
   { id:"lever",           label:"Lever",                color:"#7B5EEA" },
   { id:"ashby",           label:"Ashby",                color:"#3B7CDE" },
   { id:"indeed",          label:"Indeed",               color:"#2164F3" },
+  { id:"icims",           label:"iCIMS",                color:"#E8432D" },
+  { id:"smartrecruiters", label:"SmartRecruiters",      color:"#00B87C" },
   { id:"other",           label:"Other",                color:"#909094" },
 ];
 const ATS_MAP = Object.fromEntries(ATS_PLATFORMS.map(p=>[p.id,p]));
