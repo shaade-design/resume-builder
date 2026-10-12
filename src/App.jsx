@@ -785,6 +785,7 @@ export default function App() {
   const setClData = (next) => setStore(s => ({ ...s, clVersions: (s.clVersions||[]).map(v => v.id === clCurrent.id ? { ...v, data: next } : v) }));
 
   const [active, setActive] = useState("header");
+  const [snapshotModal, setSnapshotModal] = useState(null); // { label, company, role }
   const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState("");
   const [clTab, setClTab] = useState("content");
@@ -831,13 +832,20 @@ export default function App() {
   };
 
   // Save a snapshot of current state — stays on current version, snapshot goes to the list
-  const saveSnapshot = () => {
-    const name = window.prompt("Name this snapshot (e.g. 'Base Resume – Jul 2026'):", current.name);
-    if (!name || !name.trim()) return;
+  const saveSnapshot = () => setSnapshotModal({ label: current.name, company: "", role: "" });
+
+  const confirmSnapshot = ({ label, company, role }) => {
+    const snapName = [company, role].filter(Boolean).join(" — ") || label.trim() || current.name;
+    const snapshotId = newId();
+    const appId = Date.now();
     setStore(s => {
-      const snapshot = { id: newId(), name: name.trim(), data: JSON.parse(JSON.stringify(current.data)) };
-      return { ...s, versions: [...s.versions, snapshot] };
+      const snapshot = { id: snapshotId, name: snapName, data: JSON.parse(JSON.stringify(current.data)) };
+      const newApp = { id: appId, company: company.trim(), role: role.trim(), date: new Date().toISOString().slice(0,10), status: "Applied", url: "", notes: "", ats: "", rounds: 0, rejectionNote: "", snapshotId };
+      return { ...s, versions: [...s.versions, snapshot], applications: [newApp, ...(s.applications||[])] };
     });
+    setSnapshotModal(null);
+    setActive("tracker");
+    setTimeout(() => setEditingAppId(appId), 50);
   };
 
   const deleteVersion = (id) => setStore(s => {
@@ -1245,6 +1253,16 @@ export default function App() {
         .app-drawer-delete { background: none; border: 1px solid #FECACA; color: #B91C1C; border-radius: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; font-family: inherit; transition: background 0.15s; }
         .app-drawer-delete:hover { background: #FEF2F2; }
         .app-drawer-notes { resize: vertical; min-height: 80px; }
+        /* ── Snapshot modal ── */
+        .snap-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.32); z-index: 300; display: flex; align-items: center; justify-content: center; }
+        .snap-modal { background: white; border-radius: 10px; padding: 24px; width: 320px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.18); }
+        .snap-modal-title { font-size: 14px; font-weight: 700; color: ${T.dark}; }
+        .snap-modal-field { display: flex; flex-direction: column; gap: 5px; }
+        .snap-modal-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: ${T.light}; }
+        .snap-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+        .snap-modal-btn { padding: 7px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; }
+        .snap-modal-btn.cancel { background: ${T.border}; color: ${T.mid}; }
+        .snap-modal-btn.save { background: #D34F2F; color: white; }
         .drawer-status-select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23555558' d='M2 4l4 4 4-4'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: right 14px center !important; padding-right: 36px !important; }
         .field.app-company { flex: 1.4; font-weight: 600; }
         .field.app-role { flex: 1.2; }
@@ -1905,6 +1923,30 @@ export default function App() {
       <div className="cl-print-only">
         <CoverLetterPreview clData={clData} contact={data.contact} authorName={data.name}/>
       </div>
+      {snapshotModal && (
+        <div className="snap-modal-overlay" onClick={()=>setSnapshotModal(null)}>
+          <div className="snap-modal" onClick={e=>e.stopPropagation()}>
+            <div className="snap-modal-title">Save Snapshot &amp; Track Application</div>
+            <div className="snap-modal-field">
+              <div className="snap-modal-label">Company</div>
+              <input className="field" autoFocus value={snapshotModal.company}
+                onChange={e=>setSnapshotModal(m=>({...m,company:e.target.value}))}
+                placeholder="e.g. Figma" onKeyDown={e=>e.key==="Enter"&&document.getElementById("snap-role-input")?.focus()}/>
+            </div>
+            <div className="snap-modal-field">
+              <div className="snap-modal-label">Role</div>
+              <input id="snap-role-input" className="field" value={snapshotModal.role}
+                onChange={e=>setSnapshotModal(m=>({...m,role:e.target.value}))}
+                placeholder="e.g. Senior Product Designer"
+                onKeyDown={e=>e.key==="Enter"&&confirmSnapshot(snapshotModal)}/>
+            </div>
+            <div className="snap-modal-actions">
+              <button className="snap-modal-btn cancel" onClick={()=>setSnapshotModal(null)}>Cancel</button>
+              <button className="snap-modal-btn save" onClick={()=>confirmSnapshot(snapshotModal)}>Save &amp; Track</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
